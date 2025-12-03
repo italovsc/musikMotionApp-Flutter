@@ -4,6 +4,11 @@ Aplicativo mobile desenvolvido em Flutter/Dart que simula uma loja de discos de 
 O app permite pesquisar discos reais pela API pública Discogs, aplicar filtros por gênero, adicionar itens ao carrinho e realizar um fluxo de compra simulado.
 Também possui sistema de autenticação e cadastro de usuários com Firebase.
 
+Mobile application developed in Flutter/Dart that simulates a vinyl record store.
+The app allows users to search for real records through the public Discogs API, apply genre filters, add items to the cart, and complete a simulated purchase flow.
+It also includes a user authentication and registration system using Firebase.
+
+
 ## Funcionalidades
 
 ### Autenticação de Usuários com Firebase Auth
