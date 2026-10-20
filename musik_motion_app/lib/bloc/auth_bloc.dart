@@ -77,11 +77,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   Future<void> _onLogin(AuthLoginRequested e, Emitter<AuthState> emit) async {
     emit(AuthLoading());
-    final cred = await _authService.login(e.email, e.password);
-    if (cred != null) {
+
+    try {
+      await _authService.login(e.email, e.password);
+
       emit(AuthAuthenticated());
-    } else {
-      emit(AuthFailure('Email ou senha inválidos'));
+    } on AuthServiceException catch (e) {
+      emit(AuthFailure(e.message));
+    } catch (_) {
+      emit(AuthFailure('Não foi possível realizar o login. Tente novamente.'));
     }
   }
 }

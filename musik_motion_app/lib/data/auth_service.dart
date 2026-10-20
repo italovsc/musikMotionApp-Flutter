@@ -50,16 +50,40 @@ class AuthService {
   }
 
   // Login com email e senha
-  Future<UserCredential?> login(String email, String password) async {
+  Future<UserCredential> login(String email, String password) async {
     try {
-      final credential = await _auth.signInWithEmailAndPassword(
+      return await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-      return credential;
-    } catch (e) {
-      print('Erro ao fazer login: $e');
-      return null;
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'invalid-credential':
+        case 'user-not-found':
+        case 'wrong-password':
+          throw const AuthServiceException('Email ou senha inválidos.');
+
+        case 'invalid-email':
+          throw const AuthServiceException('Informe um email válido.');
+
+        case 'user-disabled':
+          throw const AuthServiceException('Esta conta foi desativada.');
+
+        case 'network-request-failed':
+          throw const AuthServiceException(
+            'Não foi possível conectar. Verifique sua internet.',
+          );
+
+        case 'too-many-requests':
+          throw const AuthServiceException(
+            'Muitas tentativas. Tente novamente mais tarde.',
+          );
+
+        default:
+          throw const AuthServiceException(
+            'Não foi possível realizar o login. Tente novamente.',
+          );
+      }
     }
   }
 
