@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../data/discogs_service.dart';
 import '../model/album_model.dart';
+import '../utils/album_presentation.dart';
 import '../utils/album_results.dart';
 import 'cart_screen.dart';
 
@@ -286,46 +287,92 @@ class _StoreScreenState extends State<StoreScreen> {
                       itemCount: albums.length,
                       itemBuilder: (context, index) {
                         final album = albums[index];
+                        final presentation = albumPresentation(album.title);
+                        final textTheme = Theme.of(context).textTheme;
 
-                        return ListTile(
-                          leading: SizedBox(
-                            width: 50,
-                            height: 50,
-                            child:
-                                album.image.isNotEmpty
-                                    ? Image.network(
-                                      album.image,
-                                      width: 50,
-                                      height: 50,
-                                      errorBuilder:
-                                          (_, __, ___) =>
-                                              const Icon(Icons.album),
-                                    )
-                                    : const Icon(Icons.album),
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
                           ),
-                          title: Text(album.title),
-                          subtitle:
-                              album.genres.isNotEmpty
-                                  ? Text(album.genres.join(', '))
-                                  : const Text('Sem gênero'),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.add_shopping_cart),
-                            onPressed: () {
-                              _dismissKeyboard();
-
-                              setState(() {
-                                cart.add(album);
-                              });
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    '${album.title} adicionado ao carrinho!',
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.all(12),
+                            // Allow a 72px leading image within ListTile's constraints.
+                            visualDensity: const VisualDensity(vertical: 4),
+                            titleAlignment: ListTileTitleAlignment.center,
+                            isThreeLine: presentation.artist != null,
+                            leading: SizedBox(
+                              width: 72,
+                              height: 72,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child:
+                                    album.image.isNotEmpty
+                                        ? Image.network(
+                                          album.image,
+                                          width: 72,
+                                          height: 72,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (_, __, ___) =>
+                                                  const Icon(Icons.album),
+                                        )
+                                        : const Icon(Icons.album),
+                              ),
+                            ),
+                            title: Text(
+                              presentation.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (presentation.artist != null)
+                                    Text(
+                                      presentation.artist!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: textTheme.bodyMedium,
+                                    ),
+                                  Text(
+                                    album.genres.isNotEmpty
+                                        ? album.genres.join(', ')
+                                        : 'Sem gênero',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: textTheme.bodySmall,
                                   ),
-                                  duration: const Duration(milliseconds: 1000),
-                                ),
-                              );
-                            },
+                                ],
+                              ),
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.add_shopping_cart),
+                              onPressed: () {
+                                _dismissKeyboard();
+
+                                setState(() {
+                                  cart.add(album);
+                                });
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '${album.title} adicionado ao carrinho!',
+                                    ),
+                                    duration: const Duration(
+                                      milliseconds: 1000,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         );
                       },

@@ -54,6 +54,81 @@ List<String> displayedTitles(WidgetTester tester) =>
         .toList();
 
 void main() {
+  testWidgets(
+    'card separa álbum e artista, preservando gênero e título original',
+    (tester) async {
+      final original = album('Metallica - Master Of Puppets', 1, 'Rock');
+      await openStore(tester, FakeDiscogsService([original]));
+      expect(find.byType(Card), findsOneWidget);
+      expect(displayedTitles(tester), ['Master Of Puppets']);
+      expect(find.text('Metallica'), findsOneWidget);
+      expect(find.text('Rock'), findsOneWidget);
+      expect(original.title, 'Metallica - Master Of Puppets');
+      await tester.tap(find.byIcon(Icons.add_shopping_cart));
+      await tester.pump();
+      expect(
+        find.text('Metallica - Master Of Puppets adicionado ao carrinho!'),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(Badge), matching: find.text('1')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('card sem separador omite artista e mantém fallback de gênero', (
+    tester,
+  ) async {
+    await openStore(
+      tester,
+      FakeDiscogsService([Album(title: 'Instrumental', image: '', genres: [])]),
+    );
+    expect(displayedTitles(tester), ['Instrumental']);
+    final texts = tester
+        .widgetList<Text>(
+          find.descendant(of: find.byType(Card), matching: find.byType(Text)),
+        )
+        .map((text) => text.data);
+    expect(texts, ['Instrumental', 'Sem gênero']);
+  });
+
+  testWidgets('card limita textos longos sem overflow em tela estreita', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final longArtist = List.filled(20, 'Artista').join(' ');
+    final longTitle = List.filled(30, 'Álbum').join(' ');
+    await openStore(
+      tester,
+      FakeDiscogsService([
+        Album(
+          title: '$longArtist - $longTitle',
+          image: '',
+          genres: List.filled(20, 'Rock'),
+        ),
+      ]),
+    );
+    final texts =
+        tester
+            .widgetList<Text>(
+              find.descendant(
+                of: find.byType(Card),
+                matching: find.byType(Text),
+              ),
+            )
+            .toList();
+    expect(texts.map((text) => text.maxLines), [2, 1, 1]);
+    expect(
+      texts.every((text) => text.overflow == TextOverflow.ellipsis),
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('carrinho vazio não exibe badge', (tester) async {
     await openStore(tester, FakeDiscogsService([]));
     expect(find.byType(Badge), findsNothing);
@@ -113,10 +188,23 @@ void main() {
     }
   });
 
-  testWidgets('capa ausente usa placeholder de 50 por 50', (tester) async {
+  testWidgets('capa ausente usa placeholder de 72 por 72', (tester) async {
     await openStore(tester, FakeDiscogsService([album('Album', 1, 'Rock')]));
     final leading = tester.widget<ListTile>(find.byType(ListTile)).leading!;
-    expect(tester.getSize(find.byWidget(leading)), const Size(50, 50));
+    expect(tester.getSize(find.byWidget(leading)), const Size(72, 72));
+    final tile = tester.widget<ListTile>(find.byType(ListTile));
+    expect(tile.titleAlignment, ListTileTitleAlignment.center);
+    expect(
+      tester
+          .widget<ClipRRect>(
+            find.descendant(
+              of: find.byWidget(leading),
+              matching: find.byType(ClipRRect),
+            ),
+          )
+          .borderRadius,
+      BorderRadius.circular(6),
+    );
     expect(find.byIcon(Icons.album), findsOneWidget);
     expect(find.byType(Image), findsNothing);
   });
@@ -142,7 +230,8 @@ void main() {
     expect(find.byIcon(Icons.album), findsOneWidget);
     expect(tester.takeException(), isNull);
     final leading = tester.widget<ListTile>(find.byType(ListTile)).leading!;
-    expect(tester.getSize(find.byWidget(leading)), const Size(50, 50));
+    expect(tester.getSize(find.byWidget(leading)), const Size(72, 72));
+    expect(tester.widget<Image>(find.byType(Image)).fit, BoxFit.cover);
     expect(find.text('Album'), findsOneWidget);
   });
 
@@ -270,14 +359,10 @@ void main() {
     await tester.tap(find.byIcon(Icons.search));
     await tester.pumpAndSettle();
     await applyGenres(tester);
-    expect(displayedTitles(tester), ['Artist - Rock', 'Artist - Jazz']);
+    expect(displayedTitles(tester), ['Rock', 'Jazz']);
     await applyGenres(tester); // Toggles both applied genres off.
     expect(service.calls.last, (query: 'Artist', genre: null));
-    expect(displayedTitles(tester), [
-      'Artist - Rock',
-      'Artist - Jazz',
-      'Artist - Pop',
-    ]);
+    expect(displayedTitles(tester), ['Rock', 'Jazz', 'Pop']);
   });
 
   testWidgets('debounce aguarda 450 ms sem apagar a lista', (tester) async {
@@ -393,7 +478,7 @@ void main() {
     await tester.pump();
     old.complete([album('Metallica - Metallica', 2, 'Rock')]);
     await tester.pump();
-    expect(displayedTitles(tester), ['Michael Jackson - Bad']);
+    expect(displayedTitles(tester), ['Bad']);
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
@@ -513,10 +598,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(service.calls.last.query, 'Artist');
     await applyGenres(tester);
-    expect(displayedTitles(tester), [
-      'Artist - Rock album',
-      'Artist - Jazz album',
-    ]);
+    expect(displayedTitles(tester), ['Rock album', 'Jazz album']);
     expect(service.calls.every((call) => call.genre == null), isTrue);
   });
 
@@ -544,7 +626,7 @@ void main() {
       album('Artist - Other spelling', 1, 'Rock'),
     ]);
     await openStore(tester, service);
-    expect(displayedTitles(tester), ['Artist - Album']);
+    expect(displayedTitles(tester), ['Album']);
     for (var i = 0; i < 2; i++) {
       await tester.tap(find.byIcon(Icons.add_shopping_cart));
       await tester.pumpAndSettle();
