@@ -9,6 +9,8 @@ class LoginScreen extends StatelessWidget {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
+  LoginScreen({super.key});
+
   void _login(BuildContext context) {
     context.read<AuthBloc>().add(
       AuthLoginRequested(
@@ -21,13 +23,11 @@ class LoginScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Login'),
-      ),
+      appBar: AppBar(title: Text('Login')),
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
-          if (state is AuthLoading) {
-
+          if (ModalRoute.of(context)?.isCurrent != true) {
+            return;
           }
           if (state is AuthAuthenticated) {
             // redireciona para o wrapper
@@ -62,14 +62,19 @@ class LoginScreen extends StatelessWidget {
               BlocBuilder<AuthBloc, AuthState>(
                 builder: (context, state) {
                   return ElevatedButton(
-                    onPressed: state is AuthLoading ? null : () => _login(context),
-                    child: state is AuthLoading
-                        ? SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                        : Text('Fazer login'),
+                    onPressed:
+                        state is AuthLoading ? null : () => _login(context),
+                    child:
+                        state is AuthLoading
+                            ? SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                            : Text('Fazer login'),
                   );
                 },
               ),

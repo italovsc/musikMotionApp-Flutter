@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 class PurchaseSuccessScreen extends StatelessWidget {
+  const PurchaseSuccessScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

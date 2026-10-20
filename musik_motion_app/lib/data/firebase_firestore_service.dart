@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FirestoreService {
@@ -22,5 +21,23 @@ class FirestoreService {
       'state': state,
       'createdAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<Map<String, dynamic>?> getUserData(String uid) async {
+    final doc = await _db.collection('users').doc(uid).get();
+
+    if (!doc.exists) {
+      return null;
+    }
+
+    return doc.data();
+  }
+
+  Future<void> updateUserField({
+    required String uid,
+    required String field,
+    required String value,
+  }) {
+    return _db.collection('users').doc(uid).update({field: value});
   }
 }

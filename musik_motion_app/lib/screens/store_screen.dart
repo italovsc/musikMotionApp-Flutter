@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../data/discogs_service.dart';
+import '../model/album_model.dart';
 
 import 'cart_screen.dart'; // Importa a tela do carrinho
 
 class StoreScreen extends StatefulWidget {
+  const StoreScreen({super.key});
+
   @override
   _StoreScreenState createState() => _StoreScreenState();
 }
 
 class _StoreScreenState extends State<StoreScreen> {
   TextEditingController searchController = TextEditingController();
-  List<dynamic> albums = [];
+  List<Album> albums = [];
   bool isLoading = false;
-  List<Map<String, String>> cart = []; // Estado do carrinho
+  List<Album> cart = []; // Estado do carrinho
 
   Map<String, bool> genres = {
     'Rock': false,
@@ -23,57 +28,34 @@ class _StoreScreenState extends State<StoreScreen> {
     'Electronic': false,
   };
 
-  final String _discogsToken = 'ZEfAUyffMjZfxDXICvdanBfAAHXJXjEAPjiBrSPd';
-
-  Future<List<dynamic>> fetchAlbumsFromDiscogs({String? query, String? genre}) async {
-    final params = <String, String>{
-      'type': 'release',
-    };
-    if (query != null && query.isNotEmpty) params['q'] = query;
-    if (genre != null && genre.isNotEmpty) params['genre'] = genre;
-
-    final uri = Uri.https('api.discogs.com', '/database/search', params);
-    final response = await http.get(
-      uri,
-      headers: {
-        'Authorization': 'Discogs token=$_discogsToken',
-        'User-Agent': 'MusikMotion/1.0',
-        'Accept': 'application/json',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['results'];
-    } else {
-      throw Exception('Failed to load albums: ${response.statusCode}');
-    }
-  }
-
   Future<void> _fetchAlbums() async {
     setState(() {
       isLoading = true;
       albums = [];
     });
-
+    final discogsService = context.read<DiscogsService>();
     final searchText = searchController.text.trim();
-    final selectedGenres = genres.entries.where((g) => g.value).map((g) => g.key).toList();
-    List<dynamic> fetched = [];
+    final selectedGenres = genres.entries
+        .where((g) => g.value)
+        .map((g) => g.key)
+        .toList();
+    List<Album> fetched = [];
 
     try {
       if (searchText.isEmpty && selectedGenres.isEmpty) {
-        fetched = await fetchAlbumsFromDiscogs();
+        fetched = await discogsService.fetchAlbums();
       } else if (searchText.isNotEmpty && selectedGenres.isEmpty) {
-        fetched = await fetchAlbumsFromDiscogs(query: searchText);
+        fetched = await discogsService.fetchAlbums(query: searchText);
       } else if (searchText.isNotEmpty && selectedGenres.isNotEmpty) {
-        final results = await fetchAlbumsFromDiscogs(query: searchText);
+        final results = await discogsService.fetchAlbums(query: searchText);
+
         fetched = results.where((album) {
-          final albumGenres = List<String>.from(album['genre'] ?? []);
-          return selectedGenres.any((g) => albumGenres.contains(g));
+          return selectedGenres.any((genre) => album.genres.contains(genre));
         }).toList();
       } else if (searchText.isEmpty && selectedGenres.isNotEmpty) {
-        for (var genre in selectedGenres) {
-          final results = await fetchAlbumsFromDiscogs(genre: genre);
+        for (final genre in selectedGenres) {
+          final results = await discogsService.fetchAlbums(genre: genre);
+
           fetched.addAll(results);
         }
       }
@@ -102,7 +84,8 @@ class _StoreScreenState extends State<StoreScreen> {
                     return CheckboxListTile(
                       title: Text(genre),
                       value: genres[genre],
-                      onChanged: (value) => setStateDialog(() => genres[genre] = value!),
+                      onChanged: (value) =>
+                          setStateDialog(() => genres[genre] = value!),
                     );
                   }).toList(),
                 ),
@@ -139,15 +122,19 @@ class _StoreScreenState extends State<StoreScreen> {
       appBar: AppBar(
         title: Text('Loja de Discos'),
         actions: [
-          IconButton(icon: Icon(Icons.shopping_cart), onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CartScreen(cart: cart),
-              ),
-            );
-          }),
-          IconButton(icon: Icon(Icons.filter_list), onPressed: _showGenreFilterDialog),
+          IconButton(
+            icon: Icon(Icons.shopping_cart),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => CartScreen(cart: cart)),
+              );
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.filter_list),
+            onPressed: _showGenreFilterDialog,
+          ),
         ],
       ),
       body: Column(
@@ -158,7 +145,10 @@ class _StoreScreenState extends State<StoreScreen> {
               controller: searchController,
               decoration: InputDecoration(
                 hintText: 'Buscar por artista, álbum...',
-                suffixIcon: IconButton(icon: Icon(Icons.search), onPressed: _fetchAlbums),
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.search),
+                  onPressed: _fetchAlbums,
+                ),
               ),
               onSubmitted: (_) => _fetchAlbums(),
             ),
@@ -169,34 +159,37 @@ class _StoreScreenState extends State<StoreScreen> {
                 : albums.isEmpty
                 ? Center(child: Text('Nenhum resultado'))
                 : ListView.builder(
-              itemCount: albums.length,
-              itemBuilder: (context, index) {
-                final album = albums[index];
-                final title = album['title'] ?? 'Sem título';
-                final image = album['cover_image'] ?? '';
-                return ListTile(
-                  leading: image.isNotEmpty
-                      ? Image.network(image, width: 50, height: 50)
-                      : Icon(Icons.album),
-                  title: Text(title),
-                  subtitle: album['genre'] != null
-                      ? Text((album['genre'] as List).join(', '))
-                      : Text('Sem gênero'),
-                  trailing: IconButton(
-                    icon: Icon(Icons.add_shopping_cart),
-                    onPressed: () {
-                      setState(() {
-                        cart.add({'title': title, 'image': image});
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('$title adicionado ao carrinho!'),
-                          duration: Duration(milliseconds: 1000),),
+                    itemCount: albums.length,
+                    itemBuilder: (context, index) {
+                      final album = albums[index];
+
+                      final title = album.title;
+                      final image = album.image;
+                      return ListTile(
+                        leading: image.isNotEmpty
+                            ? Image.network(image, width: 50, height: 50)
+                            : Icon(Icons.album),
+                        title: Text(title),
+                        subtitle: album.genres.isNotEmpty
+                            ? Text(album.genres.join(', '))
+                            : const Text('Sem gênero'),
+                        trailing: IconButton(
+                          icon: Icon(Icons.add_shopping_cart),
+                          onPressed: () {
+                            setState(() {
+                              cart.add(album);
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$title adicionado ao carrinho!'),
+                                duration: Duration(milliseconds: 1000),
+                              ),
+                            );
+                          },
+                        ),
                       );
                     },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),
