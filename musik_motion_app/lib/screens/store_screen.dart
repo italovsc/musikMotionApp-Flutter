@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -15,6 +17,8 @@ class StoreScreen extends StatefulWidget {
 
 class _StoreScreenState extends State<StoreScreen> {
   final TextEditingController searchController = TextEditingController();
+  Timer? _searchDebounce;
+  int _searchVersion = 0;
 
   List<Album> albums = [];
   List<Album> cart = [];
@@ -37,11 +41,33 @@ class _StoreScreenState extends State<StoreScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchVersion++;
     searchController.dispose();
     super.dispose();
   }
 
+  void _dismissKeyboard() {
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  void _onSearchChanged(String _) {
+    _searchDebounce?.cancel();
+    // Invalidate immediately, including the time spent waiting for the timer.
+    _searchVersion++;
+    setState(() {});
+    _searchDebounce = Timer(const Duration(milliseconds: 450), _fetchAlbums);
+  }
+
+  void _clearSearch() {
+    searchController.clear();
+    _fetchAlbums();
+  }
+
   Future<void> _fetchAlbums() async {
+    _searchDebounce?.cancel();
+    if (!mounted) return;
+    final version = ++_searchVersion;
     setState(() {
       isLoading = true;
       albums = [];
@@ -83,7 +109,7 @@ class _StoreScreenState extends State<StoreScreen> {
         fetched = interleaveAlbumResults(genreResults);
       }
 
-      if (!mounted) {
+      if (!mounted || version != _searchVersion) {
         return;
       }
 
@@ -91,7 +117,7 @@ class _StoreScreenState extends State<StoreScreen> {
         albums = deduplicateAlbums(fetched);
       });
     } catch (_) {
-      if (!mounted) {
+      if (!mounted || version != _searchVersion) {
         return;
       }
 
@@ -104,7 +130,7 @@ class _StoreScreenState extends State<StoreScreen> {
         ),
       );
     } finally {
-      if (mounted) {
+      if (mounted && version == _searchVersion) {
         setState(() {
           isLoading = false;
         });
@@ -113,6 +139,7 @@ class _StoreScreenState extends State<StoreScreen> {
   }
 
   void _showGenreFilterDialog() {
+    final pendingGenres = Map<String, bool>.from(genres);
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -123,13 +150,13 @@ class _StoreScreenState extends State<StoreScreen> {
               content: SingleChildScrollView(
                 child: Column(
                   children:
-                      genres.keys.map((genre) {
+                      pendingGenres.keys.map((genre) {
                         return CheckboxListTile(
                           title: Text(genre),
-                          value: genres[genre],
+                          value: pendingGenres[genre],
                           onChanged: (value) {
                             setStateDialog(() {
-                              genres[genre] = value ?? false;
+                              pendingGenres[genre] = value ?? false;
                             });
                           },
                         );
@@ -145,6 +172,7 @@ class _StoreScreenState extends State<StoreScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
+                    genres.addAll(pendingGenres);
                     Navigator.pop(dialogContext);
                     _fetchAlbums();
                   },
@@ -167,6 +195,8 @@ class _StoreScreenState extends State<StoreScreen> {
           IconButton(
             icon: const Icon(Icons.shopping_cart),
             onPressed: () {
+              _dismissKeyboard();
+
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => CartScreen(cart: cart)),
@@ -175,7 +205,10 @@ class _StoreScreenState extends State<StoreScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.filter_list),
-            onPressed: _showGenreFilterDialog,
+            onPressed: () {
+              _dismissKeyboard();
+              _showGenreFilterDialog();
+            },
           ),
         ],
       ),
@@ -187,13 +220,32 @@ class _StoreScreenState extends State<StoreScreen> {
               controller: searchController,
               decoration: InputDecoration(
                 hintText: 'Buscar por artista ou álbum...',
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.search),
-                  onPressed: _fetchAlbums,
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (searchController.text.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        tooltip: 'Limpar busca',
+                        onPressed: _clearSearch,
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.search),
+                      onPressed: () {
+                        _dismissKeyboard();
+                        _fetchAlbums();
+                      },
+                    ),
+                  ],
                 ),
               ),
+              onChanged: _onSearchChanged,
               onSubmitted: (_) {
+                _dismissKeyboard();
                 _fetchAlbums();
+              },
+              onTapOutside: (_) {
+                _dismissKeyboard();
               },
             ),
           ),
@@ -225,6 +277,8 @@ class _StoreScreenState extends State<StoreScreen> {
                           trailing: IconButton(
                             icon: const Icon(Icons.add_shopping_cart),
                             onPressed: () {
+                              _dismissKeyboard();
+
                               setState(() {
                                 cart.add(album);
                               });
