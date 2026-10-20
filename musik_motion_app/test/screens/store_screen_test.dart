@@ -636,7 +636,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.shopping_cart));
     await tester.pumpAndSettle();
-    expect(displayedTitles(tester), ['Artist - Album', 'Artist - Album']);
+    expect(displayedTitles(tester), ['Album', 'Album']);
     expect(find.text('Finalizar Compra (2 itens)'), findsOneWidget);
   });
 }
