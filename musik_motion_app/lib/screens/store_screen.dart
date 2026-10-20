@@ -193,14 +193,21 @@ class _StoreScreenState extends State<StoreScreen> {
         title: const Text('Loja de Discos'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.shopping_cart),
-            onPressed: () {
+            icon:
+                cart.isEmpty
+                    ? const Icon(Icons.shopping_cart)
+                    : Badge(
+                      label: Text('${cart.length}'),
+                      child: const Icon(Icons.shopping_cart),
+                    ),
+            onPressed: () async {
               _dismissKeyboard();
 
-              Navigator.push(
+              await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => CartScreen(cart: cart)),
               );
+              if (mounted) setState(() {});
             },
           ),
           IconButton(
@@ -254,21 +261,48 @@ class _StoreScreenState extends State<StoreScreen> {
                 isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : albums.isEmpty
-                    ? const Center(child: Text('Nenhum resultado'))
+                    ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.search_off, size: 48),
+                            SizedBox(height: 12),
+                            Text(
+                              'Nenhum resultado encontrado',
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Tente outro artista, álbum ou remova os filtros.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                     : ListView.builder(
                       itemCount: albums.length,
                       itemBuilder: (context, index) {
                         final album = albums[index];
 
                         return ListTile(
-                          leading:
-                              album.image.isNotEmpty
-                                  ? Image.network(
-                                    album.image,
-                                    width: 50,
-                                    height: 50,
-                                  )
-                                  : const Icon(Icons.album),
+                          leading: SizedBox(
+                            width: 50,
+                            height: 50,
+                            child:
+                                album.image.isNotEmpty
+                                    ? Image.network(
+                                      album.image,
+                                      width: 50,
+                                      height: 50,
+                                      errorBuilder:
+                                          (_, __, ___) =>
+                                              const Icon(Icons.album),
+                                    )
+                                    : const Icon(Icons.album),
+                          ),
                           title: Text(album.title),
                           subtitle:
                               album.genres.isNotEmpty

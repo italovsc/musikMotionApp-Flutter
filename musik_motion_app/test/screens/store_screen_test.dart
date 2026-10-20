@@ -54,6 +54,108 @@ List<String> displayedTitles(WidgetTester tester) =>
         .toList();
 
 void main() {
+  testWidgets('carrinho vazio não exibe badge', (tester) async {
+    await openStore(tester, FakeDiscogsService([]));
+    expect(find.byType(Badge), findsNothing);
+  });
+
+  for (final repeated in [false, true]) {
+    testWidgets('badge conta dois itens ${repeated ? 'iguais' : 'distintos'}', (
+      tester,
+    ) async {
+      await openStore(
+        tester,
+        FakeDiscogsService([
+          album('First', 1, 'Rock'),
+          album('Second', 2, 'Pop'),
+        ]),
+      );
+      await tester.tap(find.byIcon(Icons.add_shopping_cart).first);
+      await tester.pump();
+      expect(
+        find.descendant(of: find.byType(Badge), matching: find.text('1')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byIcon(Icons.add_shopping_cart).at(repeated ? 0 : 1),
+      );
+      await tester.pump();
+      expect(
+        find.descendant(of: find.byType(Badge), matching: find.text('2')),
+        findsOneWidget,
+      );
+    });
+  }
+
+  testWidgets('badge reflete remoções ao voltar do carrinho e some ao zerar', (
+    tester,
+  ) async {
+    await openStore(tester, FakeDiscogsService([album('Album', 1, 'Rock')]));
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.byIcon(Icons.add_shopping_cart));
+      await tester.pump();
+    }
+    for (final remaining in [1, 0]) {
+      await tester.tap(find.byIcon(Icons.shopping_cart));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.delete_outline).first);
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      if (remaining == 0) {
+        expect(find.byType(Badge), findsNothing);
+      } else {
+        expect(
+          find.descendant(of: find.byType(Badge), matching: find.text('1')),
+          findsOneWidget,
+        );
+      }
+    }
+  });
+
+  testWidgets('capa ausente usa placeholder de 50 por 50', (tester) async {
+    await openStore(tester, FakeDiscogsService([album('Album', 1, 'Rock')]));
+    final leading = tester.widget<ListTile>(find.byType(ListTile)).leading!;
+    expect(tester.getSize(find.byWidget(leading)), const Size(50, 50));
+    expect(find.byIcon(Icons.album), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+  });
+
+  testWidgets('falha de rede na capa usa placeholder sem quebrar tela', (
+    tester,
+  ) async {
+    // The widget-test HTTP client rejects network requests with status 400.
+    await openStore(
+      tester,
+      FakeDiscogsService([
+        Album(
+          title: 'Album',
+          image: 'https://example.com/missing-cover.jpg',
+          genres: ['Rock'],
+        ),
+      ]),
+    );
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.album), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    final leading = tester.widget<ListTile>(find.byType(ListTile)).leading!;
+    expect(tester.getSize(find.byWidget(leading)), const Size(50, 50));
+    expect(find.text('Album'), findsOneWidget);
+  });
+
+  testWidgets('estado vazio mostra ícone, título e orientação', (tester) async {
+    await openStore(tester, FakeDiscogsService([]));
+    expect(find.byIcon(Icons.search_off), findsOneWidget);
+    expect(find.text('Nenhum resultado encontrado'), findsOneWidget);
+    expect(
+      find.text('Tente outro artista, álbum ou remova os filtros.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('Aplicar confirma seleção somente ao confirmar o modal', (
     tester,
   ) async {
