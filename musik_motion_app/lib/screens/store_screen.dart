@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../data/discogs_service.dart';
 import '../model/album_model.dart';
+import '../utils/album_results.dart';
 import 'cart_screen.dart';
 
 class StoreScreen extends StatefulWidget {
@@ -50,10 +51,11 @@ class _StoreScreenState extends State<StoreScreen> {
 
     final searchText = searchController.text.trim();
 
-    final selectedGenres = genres.entries
-        .where((genre) => genre.value)
-        .map((genre) => genre.key)
-        .toList();
+    final selectedGenres =
+        genres.entries
+            .where((genre) => genre.value)
+            .map((genre) => genre.key)
+            .toList();
 
     List<Album> fetched = [];
 
@@ -61,27 +63,24 @@ class _StoreScreenState extends State<StoreScreen> {
       if (searchText.isEmpty && selectedGenres.isEmpty) {
         fetched = await discogsService.fetchAlbums();
       } else if (searchText.isNotEmpty && selectedGenres.isEmpty) {
-        fetched = await discogsService.fetchAlbums(
-          query: searchText,
-        );
+        fetched = await discogsService.fetchAlbums(query: searchText);
       } else if (searchText.isNotEmpty && selectedGenres.isNotEmpty) {
-        final results = await discogsService.fetchAlbums(
-          query: searchText,
-        );
+        final results = await discogsService.fetchAlbums(query: searchText);
 
-        fetched = results.where((album) {
-          return selectedGenres.any(
-            (genre) => album.genres.contains(genre),
-          );
-        }).toList();
+        fetched =
+            results.where((album) {
+              return selectedGenres.any(
+                (genre) => album.genres.contains(genre),
+              );
+            }).toList();
       } else {
+        final genreResults = <List<Album>>[];
         for (final genre in selectedGenres) {
-          final results = await discogsService.fetchAlbums(
-            genre: genre,
-          );
+          final results = await discogsService.fetchAlbums(genre: genre);
 
-          fetched.addAll(results);
+          genreResults.add(results);
         }
+        fetched = interleaveAlbumResults(genreResults);
       }
 
       if (!mounted) {
@@ -89,7 +88,7 @@ class _StoreScreenState extends State<StoreScreen> {
       }
 
       setState(() {
-        albums = fetched;
+        albums = deduplicateAlbums(fetched);
       });
     } catch (_) {
       if (!mounted) {
@@ -123,17 +122,18 @@ class _StoreScreenState extends State<StoreScreen> {
               title: const Text('Filtrar por Gêneros'),
               content: SingleChildScrollView(
                 child: Column(
-                  children: genres.keys.map((genre) {
-                    return CheckboxListTile(
-                      title: Text(genre),
-                      value: genres[genre],
-                      onChanged: (value) {
-                        setStateDialog(() {
-                          genres[genre] = value ?? false;
-                        });
-                      },
-                    );
-                  }).toList(),
+                  children:
+                      genres.keys.map((genre) {
+                        return CheckboxListTile(
+                          title: Text(genre),
+                          value: genres[genre],
+                          onChanged: (value) {
+                            setStateDialog(() {
+                              genres[genre] = value ?? false;
+                            });
+                          },
+                        );
+                      }).toList(),
                 ),
               ),
               actions: [
@@ -169,11 +169,7 @@ class _StoreScreenState extends State<StoreScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => CartScreen(
-                    cart: cart,
-                  ),
-                ),
+                MaterialPageRoute(builder: (_) => CartScreen(cart: cart)),
               );
             },
           ),
@@ -190,7 +186,7 @@ class _StoreScreenState extends State<StoreScreen> {
             child: TextField(
               controller: searchController,
               decoration: InputDecoration(
-                hintText: 'Buscar por artista, álbum...',
+                hintText: 'Buscar por artista ou álbum...',
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.search),
                   onPressed: _fetchAlbums,
@@ -202,57 +198,50 @@ class _StoreScreenState extends State<StoreScreen> {
             ),
           ),
           Expanded(
-            child: isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(),
-                  )
-                : albums.isEmpty
-                    ? const Center(
-                        child: Text('Nenhum resultado'),
-                      )
+            child:
+                isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : albums.isEmpty
+                    ? const Center(child: Text('Nenhum resultado'))
                     : ListView.builder(
-                        itemCount: albums.length,
-                        itemBuilder: (context, index) {
-                          final album = albums[index];
+                      itemCount: albums.length,
+                      itemBuilder: (context, index) {
+                        final album = albums[index];
 
-                          return ListTile(
-                            leading: album.image.isNotEmpty
-                                ? Image.network(
+                        return ListTile(
+                          leading:
+                              album.image.isNotEmpty
+                                  ? Image.network(
                                     album.image,
                                     width: 50,
                                     height: 50,
                                   )
-                                : const Icon(Icons.album),
-                            title: Text(album.title),
-                            subtitle: album.genres.isNotEmpty
-                                ? Text(
-                                    album.genres.join(', '),
-                                  )
-                                : const Text('Sem gênero'),
-                            trailing: IconButton(
-                              icon: const Icon(
-                                Icons.add_shopping_cart,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  cart.add(album);
-                                });
+                                  : const Icon(Icons.album),
+                          title: Text(album.title),
+                          subtitle:
+                              album.genres.isNotEmpty
+                                  ? Text(album.genres.join(', '))
+                                  : const Text('Sem gênero'),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.add_shopping_cart),
+                            onPressed: () {
+                              setState(() {
+                                cart.add(album);
+                              });
 
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      '${album.title} adicionado ao carrinho!',
-                                    ),
-                                    duration: const Duration(
-                                      milliseconds: 1000,
-                                    ),
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${album.title} adicionado ao carrinho!',
                                   ),
-                                );
-                              },
-                            ),
-                          );
-                        },
-                      ),
+                                  duration: const Duration(milliseconds: 1000),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
           ),
         ],
       ),

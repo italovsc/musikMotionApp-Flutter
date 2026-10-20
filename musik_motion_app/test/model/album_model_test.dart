@@ -3,6 +3,39 @@ import 'package:trabalhomobile/model/album_model.dart';
 
 void main() {
   group('Album.fromJson', () {
+    test('usa id positivo do master antes de master_id', () {
+      final album = Album.fromJson({
+        'type': 'master',
+        'id': 6495,
+        'master_id': 99,
+      });
+      expect(album.masterId, 6495);
+    });
+
+    test('usa master_id positivo quando disponível', () {
+      expect(
+        Album.fromJson({
+          'type': 'release',
+          'id': 10,
+          'master_id': 6495,
+        }).masterId,
+        6495,
+      );
+      expect(Album.fromJson({'master_id': 6495}).masterId, 6495);
+    });
+
+    test('não usa IDs ausentes, zero, negativos ou id de release', () {
+      for (final json in <Map<String, dynamic>>[
+        {},
+        {'master_id': 0},
+        {'master_id': -1},
+        {'type': 'master', 'id': 0},
+        {'type': 'release', 'id': 10},
+      ]) {
+        expect(Album.fromJson(json).masterId, isNull);
+      }
+    });
+
     test('cria Album com todos os dados recebidos', () {
       final json = {
         'title': 'Metallica - Master of Puppets',
