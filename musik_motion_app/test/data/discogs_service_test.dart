@@ -16,6 +16,81 @@ http.Response response(List<Map<String, dynamic>> results) =>
     http.Response(jsonEncode({'results': results}), 200);
 
 void main() {
+  group('respostas UTF-8 sem charset', () {
+    http.Response utf8Response(Map<String, dynamic> data) =>
+        http.Response.bytes(
+          utf8.encode(jsonEncode(data)),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+
+    test('busca preserva Unicode dos bytes recebidos', () async {
+      final client = MockClient(
+        (_) async => utf8Response({
+          'results': [
+            result('Z²'),
+            result('Revolución'),
+            result('Björk'),
+            result('Música'),
+          ],
+        }),
+      );
+      addTearDown(client.close);
+      final albums = await DiscogsService(client: client).fetchAlbums();
+      expect(albums.map((album) => album.title), [
+        'Z²',
+        'Revolución',
+        'Björk',
+        'Música',
+      ]);
+    });
+
+    test('Master, artistas e tracklist preservam Unicode com rating', () async {
+      final paths = <String>[];
+      final client = MockClient((request) async {
+        paths.add(request.url.path);
+        if (request.url.path == '/masters/1') {
+          return utf8Response({
+            'id': 1,
+            'title': 'Z²',
+            'artists': [
+              {'name': 'Björk'},
+            ],
+            'genres': ['Música'],
+            'styles': ['Música eletrônica'],
+            'tracklist': [
+              {
+                'title': 'Revolución',
+                'position': 'A1',
+                'type_': 'track',
+                'duration': '3:42',
+              },
+              {'title': 'Música', 'position': 'A2', 'type_': 'track'},
+            ],
+            'main_release': 2,
+          });
+        }
+        return utf8Response({
+          'release_id': 2,
+          'rating': {'average': 4.64, 'count': 889},
+        });
+      });
+      addTearDown(client.close);
+      final details = await DiscogsService(client: client).fetchAlbumDetails(1);
+      expect(paths, ['/masters/1', '/releases/2/rating']);
+      expect(details.title, 'Z²');
+      expect(details.artists.single.name, 'Björk');
+      expect(details.genres, ['Música']);
+      expect(details.styles, ['Música eletrônica']);
+      expect(details.tracklist.map((track) => track.title), [
+        'Revolución',
+        'Música',
+      ]);
+      expect(details.rating!.average, 4.64);
+      expect(details.rating!.count, 889);
+    });
+  });
+
   group('fetchAlbumDetails', () {
     for (final count in [889, 0]) {
       test('consulta Master e rating preservando $count votos', () async {

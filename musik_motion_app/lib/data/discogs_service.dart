@@ -50,7 +50,7 @@ class DiscogsService {
         'Erro ao buscar detalhes do álbum: ${response.statusCode}',
       );
     }
-    final data = json.decode(response.body);
+    final data = json.decode(utf8.decode(response.bodyBytes));
     if (data is! Map<String, dynamic>) {
       throw const FormatException('Resposta de detalhes inválida');
     }
@@ -124,7 +124,7 @@ class DiscogsService {
       throw Exception('Erro ao buscar álbuns: ${response.statusCode}');
     }
 
-    final data = json.decode(response.body);
+    final data = json.decode(utf8.decode(response.bodyBytes));
 
     final List results = data['results'] ?? [];
 
