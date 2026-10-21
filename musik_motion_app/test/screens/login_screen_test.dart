@@ -79,6 +79,59 @@ void main() {
     verifyNever(() => bloc.add(any()));
   });
 
+  testWidgets(
+    'autovalidação inicia somente após tentativa e acompanha correções',
+    (tester) async {
+      await openLogin(tester);
+      await tester.enterText(email, 'invalido');
+      await tester.pump();
+      expect(find.text('Informe um email válido'), findsNothing);
+      expect(find.text('Informe a senha'), findsNothing);
+      await tester.tap(find.text('Entrar'));
+      await tester.pump();
+      expect(find.text('Informe um email válido'), findsOneWidget);
+      await tester.enterText(email, 'ana@example.com');
+      await tester.pump();
+      expect(find.text('Informe um email válido'), findsNothing);
+      await tester.enterText(email, 'invalido novamente');
+      await tester.pump();
+      expect(find.text('Informe um email válido'), findsOneWidget);
+      verifyNever(() => bloc.add(any()));
+    },
+  );
+
+  for (final index in [0, 1]) {
+    testWidgets(
+      'cadastro com campo $index focado não restaura foco ao voltar',
+      (tester) async {
+        await openLogin(tester);
+        await tester.tap(find.byType(TextFormField).at(index));
+        await tester.pump();
+        expect(
+          tester
+              .widget<EditableText>(find.byType(EditableText).at(index))
+              .focusNode
+              .hasFocus,
+          isTrue,
+        );
+        expect(tester.testTextInput.isVisible, isTrue);
+        await tester.ensureVisible(find.text('Criar conta'));
+        await tester.tap(find.text('Criar conta'));
+        await tester.pumpAndSettle();
+        expect(find.text('Cadastro destino'), findsOneWidget);
+        Navigator.of(tester.element(find.text('Cadastro destino'))).pop();
+        await tester.pumpAndSettle();
+        expect(find.byType(LoginScreen), findsOneWidget);
+        for (final editable in tester.widgetList<EditableText>(
+          find.byType(EditableText),
+        )) {
+          expect(editable.focusNode.hasFocus, isFalse);
+        }
+        expect(tester.testTextInput.isVisible, isFalse);
+      },
+    );
+  }
+
   testWidgets('email inválido preserva validação', (tester) async {
     await openLogin(tester);
     await tester.enterText(email, 'invalido');
@@ -168,20 +221,29 @@ void main() {
     verifyNever(() => bloc.add(any()));
   });
 
-  testWidgets('tocar fora remove foco', (tester) async {
+  testWidgets('permite rolar com campo focado sem erro', (tester) async {
     await openLogin(tester);
+
     await tester.tap(email);
-    await tester.tap(find.text('Musik Motion'));
     await tester.pump();
+
     expect(
       tester
           .widget<EditableText>(find.byType(EditableText).first)
           .focusNode
           .hasFocus,
-      isFalse,
+      isTrue,
     );
-  });
 
+    await tester.drag(
+      find.byType(SingleChildScrollView),
+      const Offset(0, -100),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('Criar conta mantém rota de cadastro', (tester) async {
     await openLogin(tester);
     await tester.ensureVisible(find.text('Criar conta'));
