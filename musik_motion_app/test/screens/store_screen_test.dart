@@ -5,9 +5,21 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trabalhomobile/data/discogs_service.dart';
 import 'package:trabalhomobile/model/album_model.dart';
+import 'package:trabalhomobile/model/album_details.dart';
+import 'package:trabalhomobile/screens/album_details_screen.dart';
+import 'package:trabalhomobile/screens/cart_screen.dart';
 import 'package:trabalhomobile/screens/store_screen.dart';
 
 class FakeDiscogsService extends DiscogsService {
+  @override
+  Future<AlbumDetails> fetchAlbumDetails(int masterId) async => AlbumDetails(
+    masterId: masterId,
+    title: 'Details title',
+    artists: [],
+    genres: [],
+    styles: [],
+    tracklist: [],
+  );
   final calls = <({String? query, String? genre})>[];
   final List<Album> results;
   final Map<String, List<Album>> genreResults;
@@ -54,6 +66,56 @@ List<String> displayedTitles(WidgetTester tester) =>
         .toList();
 
 void main() {
+  for (final add in [true, false]) {
+    testWidgets(
+      'Details retorna ao mesmo carrinho ${add ? 'com adições' : 'sem adições'}',
+      (tester) async {
+        final original = album('Artist - Album', 1, 'Rock');
+        await openStore(tester, FakeDiscogsService([original]));
+        await tester.tap(find.text('Album'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AlbumDetailsScreen), findsOneWidget);
+        expect(
+          tester
+              .widget<AlbumDetailsScreen>(find.byType(AlbumDetailsScreen))
+              .album,
+          same(original),
+        );
+        if (add) {
+          for (var i = 0; i < 2; i++) {
+            await tester.tap(find.text('Adicionar ao carrinho'));
+            await tester.pump();
+          }
+        }
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        if (add) {
+          expect(
+            find.descendant(of: find.byType(Badge), matching: find.text('2')),
+            findsOneWidget,
+          );
+        } else {
+          expect(find.byType(Badge), findsNothing);
+        }
+        await tester.tap(find.byIcon(Icons.shopping_cart));
+        await tester.pumpAndSettle();
+        final cart = tester.widget<CartScreen>(find.byType(CartScreen)).cart;
+        expect(cart, hasLength(add ? 2 : 0));
+        expect(cart.every((item) => identical(item, original)), isTrue);
+      },
+    );
+  }
+
+  testWidgets('botão do card adiciona sem abrir Details', (tester) async {
+    await openStore(tester, FakeDiscogsService([album('Album', 1, 'Rock')]));
+    await tester.tap(find.byIcon(Icons.add_shopping_cart));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlbumDetailsScreen), findsNothing);
+    expect(
+      find.descendant(of: find.byType(Badge), matching: find.text('1')),
+      findsOneWidget,
+    );
+  });
   testWidgets(
     'card separa álbum e artista, preservando gênero e título original',
     (tester) async {

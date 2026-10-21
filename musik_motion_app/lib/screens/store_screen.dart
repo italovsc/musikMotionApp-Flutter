@@ -8,6 +8,7 @@ import '../model/album_model.dart';
 import '../utils/album_presentation.dart';
 import '../utils/album_results.dart';
 import 'cart_screen.dart';
+import 'album_details_screen.dart';
 
 class StoreScreen extends StatefulWidget {
   const StoreScreen({super.key});
@@ -50,6 +51,11 @@ class _StoreScreenState extends State<StoreScreen> {
 
   void _dismissKeyboard() {
     FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  void _addToCart(Album album) {
+    if (!mounted) return;
+    setState(() => cart.add(album));
   }
 
   void _onSearchChanged(String _) {
@@ -296,6 +302,19 @@ class _StoreScreenState extends State<StoreScreen> {
                             vertical: 6,
                           ),
                           child: ListTile(
+                            onTap: () {
+                              _dismissKeyboard();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => AlbumDetailsScreen(
+                                        album: album,
+                                        onAddToCart: _addToCart,
+                                      ),
+                                ),
+                              );
+                            },
                             contentPadding: const EdgeInsets.all(12),
                             // Allow a 72px leading image within ListTile's constraints.
                             visualDensity: const VisualDensity(vertical: 4),
@@ -357,9 +376,7 @@ class _StoreScreenState extends State<StoreScreen> {
                               onPressed: () {
                                 _dismissKeyboard();
 
-                                setState(() {
-                                  cart.add(album);
-                                });
+                                _addToCart(album);
 
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
