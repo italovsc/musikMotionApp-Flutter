@@ -17,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -32,9 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final email = value.trim();
 
-    final emailRegex = RegExp(
-      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-    );
+    final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
     if (!emailRegex.hasMatch(email)) {
       return 'Informe um email válido';
@@ -52,6 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _login(BuildContext context) {
+    if (context.read<AuthBloc>().state is AuthLoading) return;
     FocusScope.of(context).unfocus();
 
     if (!(_formKey.currentState?.validate() ?? false)) {
@@ -69,9 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Login'),
-      ),
+      appBar: AppBar(title: const Text('Login')),
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (ModalRoute.of(context)?.isCurrent != true) {
@@ -79,10 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
           }
 
           if (state is AuthAuthenticated) {
-            Navigator.pushReplacementNamed(
-              context,
-              '/navigation',
-            );
+            Navigator.pushReplacementNamed(context, '/navigation');
           }
 
           if (state is AuthFailure) {
@@ -94,80 +89,147 @@ class _LoginScreenState extends State<LoginScreen> {
             );
           }
         },
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Center(
-                  child: Text(
-                    'Musik Motion',
-                    style: TextStyle(fontSize: 36),
-                  ),
-                ),
-                const SizedBox(height: 20),
+        child: SafeArea(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Form(
+                    key: _formKey,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 8),
+                        const Icon(Icons.album, size: 44),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Musik Motion',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.headlineLarge
+                              ?.copyWith(fontStyle: FontStyle.italic),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Bem-vindo de volta',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Entre para continuar explorando seus discos.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 28),
 
-                TextFormField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                  ),
-                  validator: _emailValidator,
-                ),
+                        TextFormField(
+                          controller: emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                          decoration: InputDecoration(
+                            labelText: 'Email',
+                            prefixIcon: const Icon(Icons.email_outlined),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          validator: _emailValidator,
+                        ),
 
-                const SizedBox(height: 10),
+                        const SizedBox(height: 16),
 
-                TextFormField(
-                  controller: passwordController,
-                  obscureText: true,
-                  textInputAction: TextInputAction.done,
-                  decoration: const InputDecoration(
-                    labelText: 'Senha',
-                  ),
-                  validator: _passwordValidator,
-                  onFieldSubmitted: (_) {
-                    _login(context);
-                  },
-                ),
-
-                const SizedBox(height: 20),
-
-                BlocBuilder<AuthBloc, AuthState>(
-                  builder: (context, state) {
-                    return ElevatedButton(
-                      onPressed:
-                          state is AuthLoading ? null : () => _login(context),
-                      child: state is AuthLoading
-                          ? const SizedBox(
-                              height: 16,
-                              width: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                        TextFormField(
+                          controller: passwordController,
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                          decoration: InputDecoration(
+                            labelText: 'Senha',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            suffixIcon: IconButton(
+                              tooltip:
+                                  _obscurePassword
+                                      ? 'Mostrar senha'
+                                      : 'Ocultar senha',
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
                               ),
-                            )
-                          : const Text('Fazer login'),
-                    );
-                  },
-                ),
+                              onPressed:
+                                  () => setState(
+                                    () => _obscurePassword = !_obscurePassword,
+                                  ),
+                            ),
+                          ),
+                          validator: _passwordValidator,
+                          onFieldSubmitted: (_) {
+                            _login(context);
+                          },
+                        ),
 
-                TextButton(
-                  onPressed: () {
-                    Navigator.pushNamed(
-                      context,
-                      '/register',
-                    );
-                  },
-                  child: const Text(
-                    'Não possui cadastro?',
+                        const SizedBox(height: 20),
+
+                        BlocBuilder<AuthBloc, AuthState>(
+                          builder: (context, state) {
+                            return ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(52),
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.primary,
+                                foregroundColor:
+                                    Theme.of(context).colorScheme.onPrimary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed:
+                                  state is AuthLoading
+                                      ? null
+                                      : () => _login(context),
+                              child:
+                                  state is AuthLoading
+                                      ? const SizedBox(
+                                        height: 16,
+                                        width: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                      : const Text('Entrar'),
+                            );
+                          },
+                        ),
+
+                        const SizedBox(height: 16),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            const Text('Não possui uma conta?'),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/register');
+                              },
+                              child: const Text('Criar conta'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
