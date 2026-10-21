@@ -66,15 +66,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (user == null) return;
 
-    final controller = TextEditingController(text: currentValue);
+    var editedValue = currentValue;
 
     await showDialog(
       context: context,
       builder:
           (dialogContext) => AlertDialog(
             title: Text('Editar ${_fieldLabel(fieldName)}'),
-            content: TextField(
-              controller: controller,
+            content: TextFormField(
+              initialValue: currentValue,
+              onChanged: (value) => editedValue = value,
               decoration: InputDecoration(
                 labelText: 'Novo ${_fieldLabel(fieldName)}',
               ),
@@ -86,7 +87,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               ElevatedButton(
                 onPressed: () async {
-                  final newValue = controller.text.trim();
+                  final newValue = editedValue.trim();
 
                   if (newValue.isEmpty) {
                     return;
@@ -120,84 +121,149 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
     );
-
-    controller.dispose();
   }
+
+  Widget _logoutButton() => OutlinedButton.icon(
+    onPressed: () {
+      context.read<AuthBloc>().add(AuthLogoutRequested());
+    },
+    icon: const Icon(Icons.logout),
+    label: const Text('Sair da conta'),
+  );
 
   @override
   Widget build(BuildContext context) {
-    if (userData == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Perfil'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout),
-              tooltip: 'Sair',
-              onPressed: () {
-                context.read<AuthBloc>().add(AuthLogoutRequested());
-              },
-            ),
-          ],
-        ),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
+    final textTheme = Theme.of(context).textTheme;
+    final fullName = [userData?['name'], userData?['lastName']]
+        .where((value) => value != null && value.toString().trim().isNotEmpty)
+        .join(' ');
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Perfil'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sair',
-            onPressed: () {
-              context.read<AuthBloc>().add(AuthLogoutRequested());
-            },
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            const Icon(Icons.person, size: 100, color: Colors.white),
-            const SizedBox(height: 20),
-            _buildInfoRow('Nome', userData!['name']),
-            _buildInfoRow('Sobrenome', userData!['lastName']),
-            _buildInfoRow('Email', userData!['email'], editable: false),
-            _buildInfoRow('Endereço', userData!['address']),
-            _buildInfoRow('Cidade', userData!['city']),
-            _buildInfoRow('Estado', userData!['state']),
-          ],
-        ),
+      appBar: AppBar(title: const Text('Perfil')),
+      body: SafeArea(
+        child:
+            userData == null
+                ? Column(
+                  children: [
+                    const Expanded(
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: _logoutButton(),
+                    ),
+                  ],
+                )
+                : SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 600),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Center(
+                            child: CircleAvatar(
+                              radius: 28,
+                              child: Icon(Icons.person, size: 32),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            fullName,
+                            textAlign: TextAlign.center,
+                            style: textTheme.headlineSmall,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            userData!['email']?.toString() ?? '',
+                            textAlign: TextAlign.center,
+                            style: textTheme.bodyMedium,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildSection('Dados pessoais', [
+                            _buildInfoRow(
+                              'Nome',
+                              userData!['name'],
+                              Icons.person_outline,
+                            ),
+                            _buildInfoRow(
+                              'Sobrenome',
+                              userData!['lastName'],
+                              Icons.badge_outlined,
+                            ),
+                          ]),
+                          const SizedBox(height: 12),
+                          _buildSection('Endereço', [
+                            _buildInfoRow(
+                              'Endereço',
+                              userData!['address'],
+                              Icons.home_outlined,
+                            ),
+                            _buildInfoRow(
+                              'Cidade',
+                              userData!['city'],
+                              Icons.location_city,
+                            ),
+                            _buildInfoRow(
+                              'Estado',
+                              userData!['state'],
+                              Icons.map_outlined,
+                            ),
+                          ]),
+                          const SizedBox(height: 12),
+                          _logoutButton(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, dynamic value, {bool editable = true}) {
-    final displayValue = value?.toString() ?? '';
+  Widget _buildSection(String title, List<Widget> fields) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(title, style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 4),
+      Card(
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(children: fields),
+        ),
+      ),
+    ],
+  );
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(flex: 3, child: Text(displayValue)),
-          if (editable)
-            IconButton(
-              icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
-              onPressed: () {
-                _editField(_fieldKey(label), displayValue);
-              },
-            ),
-        ],
+  Widget _buildInfoRow(String label, dynamic value, IconData icon) {
+    final displayValue = value?.toString() ?? '';
+    final textTheme = Theme.of(context).textTheme;
+    return ListTile(
+      minTileHeight: 56,
+      minVerticalPadding: 4,
+      leading: Icon(icon, size: 22),
+      title: Text(label, style: textTheme.bodySmall),
+      subtitle: Text(
+        displayValue,
+        style: textTheme.titleMedium,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: IconButton(
+        icon: const Icon(Icons.edit_outlined),
+        tooltip: 'Editar ${_fieldLabel(_fieldKey(label))}',
+        onPressed: () {
+          _editField(_fieldKey(label), displayValue);
+        },
       ),
     );
   }
