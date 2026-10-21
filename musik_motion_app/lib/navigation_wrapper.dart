@@ -19,7 +19,17 @@ class _NavigationWrapperState extends State<NavigationWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = <Widget>[HomeScreen(), StoreScreen(), const ProfileScreen()];
+    final pages = <Widget>[
+      HomeScreen(
+        onExploreCatalog: () {
+          setState(() {
+            _currentIndex = 1;
+          });
+        },
+      ),
+      const StoreScreen(),
+      const ProfileScreen(),
+    ];
 
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, authState) {
